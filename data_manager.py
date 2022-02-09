@@ -102,7 +102,11 @@ class DataManager(object):
     def load(self, data_filename):
 
         print('Loading data ...')
-        data = pd.read_table(data_filename, sep=self.sep)
+        try:
+          data = pd.read_table(data_filename, sep=self.sep)
+        except:
+          data = pd.read_csv(data_filename, on_bad_lines='skip') # 추가 - 예외
+
         data = np.asarray(data)
         if self.randomize_data == True:
             np.random.shuffle(data)
@@ -150,7 +154,7 @@ class DataManager(object):
         self.word_frequencies = Counter(chain(*self.captions)).most_common()
 
     def remove_infrequent_words(self):
-        #TODO Add option to remove captions that have a words not in vocabulary
+        # TODO Add option to remove captions that have a words not in vocabulary
         print('Removing words with a frequency less than',
                         self.word_frequency_treshold,'...')
         frequent_threshold_arg=len(self.word_frequencies)  # set default frequent_threshold_arg
@@ -161,7 +165,6 @@ class DataManager(object):
                 break
 
         previous_vocabulary_size = len(self.word_frequencies)
-        # print(self.word_frequencies)
         if self.word_frequency_treshold != 0:
             self.word_frequencies = np.asarray(
                         self.word_frequencies[0:frequent_threshold_arg])
@@ -205,9 +208,6 @@ class DataManager(object):
             number_of_images = len(self.image_feature_files)
             for image_arg,image_file in tqdm(enumerate(self.image_feature_files)):
                 image_path = image_directory + image_file
-                # if image_arg%100 == 0:
-                #     print('%.2f %% completed' %
-                #             round(100*image_arg/number_of_images,2))
                 img = image.load_img(image_path, target_size=(224, 224))
                 img = image.img_to_array(img)
                 img = np.expand_dims(img, axis=0)
@@ -305,23 +305,26 @@ class DataManager(object):
                 self.extracted_features.append(np.squeeze(CNN_features))
             self.extracted_features = np.asarray(self.extracted_features)
         elif self.cnn_extractor=='resnet50':
-            from keras.applications.resnet50 import ResNet50, preprocess_input
+            # from keras.applications.resnet50 import ResNet50, preprocess_input
+            from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input # 추가 - 변경
             base_model = ResNet50(weights="imagenet")
             model = Model(inputs=base_model.input, outputs=base_model.get_layer('avg_pool').output)
             self.extracted_features = []
             self.image_feature_files = list(set(self.image_files))
             number_of_images = len(self.image_feature_files)
             for image_arg,image_file in tqdm(enumerate(self.image_feature_files)):
-                image_path = image_directory + image_file
-                # if image_arg%100 == 0:
-                #     print('%.2f %% completed' %
-                #             round(100*image_arg/number_of_images,2))
+                
+                if ".jpg" in image_file:
+                    image_path = image_directory + image_file
+                else:
+                    image_path = str(image_directory) + str(image_file) + ".jpg" # 추가 - 확장자
                 img = image.load_img(image_path, target_size=(224, 224))
                 img = image.img_to_array(img)
                 img = np.expand_dims(img, axis=0)
                 img = preprocess_input(img)
                 CNN_features = model.predict(img)
                 self.extracted_features.append(np.squeeze(CNN_features))
+
             self.extracted_features = np.asarray(self.extracted_features)
         elif self.cnn_extractor=='xception':
             from keras.applications.xception import Xception, preprocess_input
@@ -354,34 +357,35 @@ class DataManager(object):
                 if image_arg%100 == 0:
                     print('%.2f %% completed' %
                             round(100*image_arg/number_of_images,2))
-                # img = image.load_img(image_path, target_size=(224, 224))
-                # img = image.img_to_array(img)
                 img = cv2.resize(cv2.imread(image_path), (224, 224)).astype(np.float32)
-                    # Remove train image mean
+                # Remove train image mean
                 img[:,:,0] -= 103.939
                 img[:,:,1] -= 116.779
                 img[:,:,2] -= 123.68
                 img = np.expand_dims(img, axis=0)
-                # img = preprocess_input(img)
                 CNN_features = model.predict(img)
                 self.extracted_features.append(np.squeeze(CNN_features))
             self.extracted_features = np.asarray(self.extracted_features)
             
     def write_image_features_to_h5(self):
         print('Writing image features to h5...')
-        dataset_file = h5py.File(self.cnn_extractor +
+        try:
+          dataset_file = h5py.File(self.cnn_extractor +
                                  '_image_name_to_features.h5')
+        except: # 추가 - 예외
+          dataset_file = h5py.File(self.cnn_extractor +
+                                 '_image_name_to_features.h5','w')
         number_of_features = len(self.image_feature_files)
         for image_arg, image_file in tqdm(enumerate(self.image_feature_files)):
-            file_id = dataset_file.create_group(image_file)
-            image_data = file_id.create_dataset('image_features',
-                                        (self.IMG_FEATS,), dtype='float32')
+            
+            if not type(image_file) is str:
+                file_id = dataset_file.create_group(str(image_file)) # 추가 - 타입체크
+            else:
+                file_id = dataset_file.create_group(image_file)
+
+            image_data = file_id.create_dataset('image_features',(self.IMG_FEATS,), dtype='float32')
             image_data[:] = self.extracted_features[image_arg,:]
 
-            # if image_arg%100 == 0:
-            #      print('Number of image processed:', image_arg)
-            #      print('Number of image remaining:',
-            #             number_of_features-image_arg)
         dataset_file.close()
 
     def write_image_feature_files(self):
@@ -434,7 +438,6 @@ class DataManager(object):
 
     def move_to_path(self):
         directory = self.dump_path
-        # print(directory)
         if not os.path.exists(directory):
             os.makedirs(directory)
         os.chdir(directory)
@@ -444,9 +447,12 @@ class DataManager(object):
 
     def split_data(self, train_porcentage=.90):
 
-        complete_data = pd.read_table('complete_data.txt',sep='*')
+        try:
+          complete_data = pd.read_table('complete_data.txt',sep='*')
+        except:
+          complete_data = pd.read_table('complete_data.txt',sep='*', on_bad_lines='skip') # 추가 - 예외
+
         data_size = complete_data.shape[0]
-        # training_size = int(data_size*train_porcentage)
         training_size = int(data_size*1)
         complete_training_data = complete_data[0:training_size]
         test_data = complete_data[training_size:]
@@ -467,8 +473,6 @@ if __name__ == '__main__':
     captions_filename = root_path + 'image_text_data.txt'
     image_path='/home/eric/data/social_images/'
 
-    # root_path = '../datasets/IAPR_2012/iaprtc12/'
-    # captions_filename = root_path + 'IAPR_2012_captions.txt'
     data_manager = DataManager(data_filename = captions_filename,
                                 max_caption_length = 30,
                                 word_frequency_threshold = 1,

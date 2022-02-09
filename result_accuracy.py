@@ -1,14 +1,14 @@
 import numpy as np
 import os
 import pandas as pd
-# root_path='/home/eric/Documents/Hashtag-recommendation-for-social-images/neural_image_captioning/datasets/Custom/preprocessed_data'
-root_path='../../datasets/image_text/preprocessed_data'
-# root_path='/home/eric/Documents/Hashtag-recommendation-for-social-images/neural_image_captioning/datasets/NUS-WIDE/preprocessed_data'
+
+root_path='./dataset/preprocessed_data'
 target_path=os.path.join(root_path,"target_captions.txt")
 pred_path=os.path.join(root_path,"predicted_hashtags.txt")
 target=open(target_path,"r") 
 test_y=[]
 pred_y=[]
+
 with open(pred_path,"r") as file:
     predicted_labels=file.readlines()
     for label in predicted_labels:
@@ -17,32 +17,19 @@ with open(pred_path,"r") as file:
         label_arr_ori=label.strip().split(' ')
         label_arr = list(set(label_arr_ori)) 
         label_arr.sort(key=label_arr_ori.index)
-        # print(label_arr)
-        # print(target_arr)
         test_y.append(target_arr)
         pred_y.append(label_arr)
-    # print(predicted_labels)
 target.close()
-# with open("target_captions.txt","r") as file:
-#     target_labels=file.readlines()
-    # print(target_labels)
 
 def precision_score(test_y, pred_y, k=1):
     p_score = []
   
     for i in range(len(test_y)):
-        # print(pred_y[i][-k:])
-        # print(pred_y[i][-k])
-        # result_at_topk = pred_y[i][-k:]
         count = 0
         for j in range(0,k):
             if(pred_y[i][j] in test_y[i]):
                 count+=1
         p_score.append(float(count) / float(k))
-            # if j in test_y[i]:
-                # count += 1
-        # p_score.append(float(count) / float(k))
-
     return np.mean(p_score)
 
 def recall_score(test_y, pred_y, k=1):
@@ -60,11 +47,6 @@ def recall_score(test_y, pred_y, k=1):
 def hits_score(test_y, pred_y, k=1):
     h_score = []
     for i in range(len(test_y)):
-        # result_at_topk = pred_y[i][-k:]
-        # count = 0
-        # for j in result_at_topk:
-        #     if j in test_y[i]:
-        #         count += 1
         count = 0
         end=min(k,len(pred_y[i]))
         for j in range(0,end):
@@ -79,6 +61,7 @@ recalls=[]
 hits_rates=[]
 num=5
 names=[]
+
 for i in range(num*3):
     if(i<num):
         names.append("precision@%d" %(i%num+1))

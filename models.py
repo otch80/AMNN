@@ -27,6 +27,7 @@ def NIC(max_token_length, vocabulary_size,tweet_max_len=300,tweet_max_words=5000
     text_dropout = Dropout(.5, name='text_dropout')(text_to_embedding)
 
     tweet_input = Input(shape=(tweet_max_len,), dtype='int32',name='tweet')
+
     if configs['include_tweet']:
         # tweet embedding
         if(configs["w2v_weights"]):

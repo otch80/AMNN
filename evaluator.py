@@ -9,7 +9,8 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from config import configs
 from keras.models import Model
-from keras.backend.tensorflow_backend import set_session
+# from keras.backend.tensorflow_backend import set_session
+from tensorflow.compat.v1.keras.backend import set_session
 import os
 # from Attention import Attention
 
@@ -32,9 +33,16 @@ class Evaluator(object):
         self.EOS = str(data_logs['EOS:'])
         self.IMG_FEATS = int(data_logs['IMG_FEATS:'])
         self.MAX_TOKEN_LENGTH = int(data_logs['max_caption_length:']) + 2
-        self.test_data = pd.read_table(data_path +
-                                       test_data_filename, sep='*')
-        self.full_data=pd.read_table(data_path+"complete_data.txt", sep='*')
+        try:
+          self.test_data = pd.read_table(data_path + test_data_filename, sep='*')
+        except: # 추가 - 예외
+          self.test_data = pd.read_table(data_path + test_data_filename, sep='*', on_bad_lines='skip')
+                                       
+        try:
+          self.full_data=pd.read_table(data_path+"complete_data.txt", sep='*')
+        except: # 추가 - 예외
+          self.full_data=pd.read_table(data_path+"complete_data.txt", sep='*', on_bad_lines='skip')
+        
         self.word_to_id = pickle.load(open(data_path +
                                            word_to_id_filename, 'rb'))
         self.id_to_word = pickle.load(open(data_path +
@@ -48,7 +56,10 @@ class Evaluator(object):
     def initialize_token(self):
         complete_filename = self.data_path + 'complete_data.txt'
         print('Loading all tweet dataset...')
-        complete_dataset = pd.read_table(complete_filename,delimiter='*')
+        try:
+          complete_dataset = pd.read_table(complete_filename,delimiter='*')
+        except: # 추가 - 예외
+          complete_dataset = pd.read_table(complete_filename,delimiter='*', on_bad_lines='skip')          
         complete_dataset = np.asarray(complete_dataset, dtype=str)
         tweets=complete_dataset[:,1]
         self.tokenizer = Tokenizer(num_words=configs['tweet_max_words'], lower=True)
@@ -71,11 +82,9 @@ class Evaluator(object):
                                             str.contains('iaprtc12')]
         else:
             test_data = self.test_data
-        # print(test_data)
 
         if image_file == None:
             line=np.array(test_data.sample(1))
-            # image_name = np.asarray(test_data.sample(1))[0][0]
             image_name = line[0][0]
             tweets=line[0][1]
         else:
@@ -86,14 +95,17 @@ class Evaluator(object):
         tweet_vec=pad_sequences(sequences, maxlen=configs['tweet_max_len'])
 
         print(image_name)
-        features = self.image_names_to_features[image_name]['image_features'][:]
+        try:
+            features = self.image_names_to_features[image_name]['image_features'][:]
+        except: # 추가 - 예외
+            features = self.image_names_to_features[image_name]['image_features'][:]
         print(features.shape)
         text = np.zeros((1, self.MAX_TOKEN_LENGTH, self.VOCABULARY_SIZE))
         begin_token_id = self.word_to_id[self.BOS]
         text[0, 0, begin_token_id] = 1
         image_features = np.zeros((1, self.MAX_TOKEN_LENGTH, self.IMG_FEATS))
         image_features[0, 0, :] = features
-        print(self.BOS)
+        print(f"self.BOS : {self.BOS}")
         num=0
         list_word_id=[]
         for word_arg in range(self.MAX_TOKEN_LENGTH - 1):
@@ -105,20 +117,14 @@ class Evaluator(object):
                 predictions = self.model.predict([text,image_features])
             matrix=np.argsort(predictions[0, word_arg, :])
             word_id=0
-            # print(matrix)
             word_id=matrix[-1]
             for id in reversed(matrix):
                 if id not in list_word_id:
-                    # print(id)
                     target_word_id=id
                     list_word_id.append(id)
                     break
-            # word_id = np.argmax(predictions[0, word_arg, :])
-            # print(np.argmax(predictions[0, word_arg, :]))
-            # list_wordid=list_wordid.append(word_id)
             next_word_arg = word_arg + 1
             text[0, next_word_arg, target_word_id] = 1
-            # print(text)
             word = self.id_to_word[target_word_id]
             print(word,end=" ")
             num+=1
@@ -128,7 +134,6 @@ class Evaluator(object):
                 break
         print()
         print(list_word_id)
-            #images_path = '../dataset/images/'
         plt.imshow(plt.imread(self.images_path + image_name))
         plt.show()
 
@@ -142,11 +147,9 @@ class Evaluator(object):
                                             str.contains('iaprtc12')]
         else:
             test_data = self.test_data
-        # print(test_data)
 
         if image_file == None:
             line=np.array(test_data.sample(1))
-            # image_name = np.asarray(test_data.sample(1))[0][0]
             image_name = line[0][0]
             tweets=line[0][1]
         else:
@@ -157,7 +160,10 @@ class Evaluator(object):
         tweet_vec=pad_sequences(sequences, maxlen=configs['tweet_max_len'])
 
         print(image_name)
-        features = self.image_names_to_features[image_name]['image_features'][:]
+        try:
+          features = self.image_names_to_features[image_name]['image_features'][:]
+        except: # 추가 - 예외
+          features = self.image_names_to_features[str(image_name)]['image_features'][:]
         print(features.shape)
         text = np.zeros((1, self.MAX_TOKEN_LENGTH, self.VOCABULARY_SIZE))
         begin_token_id = self.word_to_id[self.BOS]
@@ -173,20 +179,14 @@ class Evaluator(object):
   
             matrix=np.argsort(predictions[0, word_arg, :])
             word_id=0
-            # print(matrix)
             word_id=matrix[-1]
             for id in reversed(matrix):
                 if id not in list_word_id:
-                    # print(id)
                     target_word_id=id
                     list_word_id.append(id)
                     break
-            # word_id = np.argmax(predictions[0, word_arg, :])
-            # print(np.argmax(predictions[0, word_arg, :]))
-            # list_wordid=list_wordid.append(word_id)
             next_word_arg = word_arg + 1
             text[0, next_word_arg, target_word_id] = 1
-            # print(text)
             word = self.id_to_word[target_word_id]
             print(word,end=" ")
             num+=1
@@ -195,9 +195,13 @@ class Evaluator(object):
             elif(num==(configs['num_hashtags'])):
                 break
         print()
-        print(list_word_id)
-            #images_path = '../dataset/images/'
-        plt.imshow(plt.imread(self.images_path + image_name))
+        print(f"list_word_id : {list_word_id}")
+        
+        try:
+          plt.imshow(plt.imread(self.images_path + image_name))
+        except: # 추가 - 예외
+          plt.imshow(plt.imread(self.images_path + str(image_name) + ".jpg"), aspect='auto')
+        
         plt.show()
 
 
@@ -213,7 +217,6 @@ class Evaluator(object):
         
         if image_file == None:
             line=np.array(test_data.sample(1))
-            # image_name = np.asarray(test_data.sample(1))[0][0]
             image_name = line[0][0]
             tweets=line[0][1]
         else:
@@ -223,15 +226,20 @@ class Evaluator(object):
         sequences = self.tokenizer.texts_to_sequences(tweets)
         tweet_vec=pad_sequences(sequences, maxlen=configs['tweet_max_len'])
 
-        print(image_name)
-        features = self.image_names_to_features[image_name]['image_features'][:]
+        print(f"image_name : {image_name}")
+
+        try:
+          features = self.image_names_to_features[image_name]['image_features'][:]
+        except: # 추가 - 예외
+          features = self.image_names_to_features[str(image_name)]['image_features'][:]
+
         print(features.shape)
         text = np.zeros((1, self.MAX_TOKEN_LENGTH, self.VOCABULARY_SIZE))
         begin_token_id = self.word_to_id[self.BOS]
         text[0, 0, begin_token_id] = 1
         image_features = np.zeros((1, self.MAX_TOKEN_LENGTH, self.IMG_FEATS))
         image_features[0, 0, :] = features
-        print(self.BOS)
+        print(f"self.BOS : {self.BOS}")
         model= self.model
         intermediate_layer_model = Model(inputs=model.input,outputs=model.get_layer(layer_name).output)
         predictions =intermediate_layer_model.predict([text, image_features,tweet_vec])
@@ -251,8 +259,10 @@ class Evaluator(object):
             tweet=str(tweet_list[image_arg])
             sequences = self.tokenizer.texts_to_sequences([tweet])
             tweet_vec=pad_sequences(sequences, maxlen=configs['tweet_max_len'])
-            features = self.image_names_to_features[image_name]\
-                                            ['image_features'][:]
+            try:
+              features = self.image_names_to_features[image_name]['image_features'][:]
+            except: # 추가 - 예외
+              features = self.image_names_to_features[str(image_name)]['image_features'][:]
             text = np.zeros((1, self.MAX_TOKEN_LENGTH, self.VOCABULARY_SIZE))
             begin_token_id = self.word_to_id[self.BOS]
             text[0, 0, begin_token_id] = 1
@@ -264,12 +274,10 @@ class Evaluator(object):
             batch_tweets.append(tweet_vec[0,:])
             batch_text.append(text[0,:,:])
             batch_image.append(image_features[0,:,:])
-            # print(len(batch_text))
             if(len(batch_text)>=configs['batch_size']):
                 model= self.model
                 intermediate_layer_model = Model(inputs=model.input,outputs=model.get_layer(layer_name).output)
                 predictions =intermediate_layer_model.predict([batch_text, batch_image,batch_tweets])
-                # print(predictions.shape)
                 for i in range(predictions.shape[0]):
                     f_out.create_dataset(name=batch_image_names[i], data=predictions[i].flatten())
 
@@ -277,10 +285,6 @@ class Evaluator(object):
                 batch_image=[]
                 batch_text=[]
                 batch_image_names=[]
-            # print(predictions.flatten().shape)
-            # features_output.append(predictions.flatten())
-            # f_out.create_dataset(name=image_name, data=predictions.flatten())
-            # break
         if(len(batch_text)>=0):
             model= self.model
             intermediate_layer_model = Model(inputs=model.input,outputs=model.get_layer(layer_name).output)
@@ -288,13 +292,6 @@ class Evaluator(object):
             for i in range(predictions.shape[0]):
                 f_out.create_dataset(name=batch_image_names[i], data=predictions[i].flatten())
         f_out.close()
-        
-        # for i in tqdm(range(len(image_names))):
-            
-            # break
-
-
-
 
     def write_captions(self, dump_filename=None):
         if dump_filename == None:
@@ -309,13 +306,15 @@ class Evaluator(object):
         for image_arg,image_name in tqdm(enumerate(image_names)):
             count+=1
             
-            tweet=str(tweet_list[image_arg])  # nan bug
-            # print(tweet)
+            tweet=str(tweet_list[image_arg])
             sequences = self.tokenizer.texts_to_sequences([tweet])
             tweet_vec=pad_sequences(sequences, maxlen=configs['tweet_max_len'])
 
-            features = self.image_names_to_features[image_name]\
-                                            ['image_features'][:]
+            try:
+                features = self.image_names_to_features[image_name]['image_features'][:]
+            except: # 추가 - 예외
+                features = self.image_names_to_features[str(image_name)]['image_features'][:]
+            
             text = np.zeros((1, self.MAX_TOKEN_LENGTH, self.VOCABULARY_SIZE))
             begin_token_id = self.word_to_id[self.BOS]
             text[0, 0, begin_token_id] = 1
@@ -335,15 +334,12 @@ class Evaluator(object):
 
                 matrix=np.argsort(predictions[0, word_arg, :])
                 word_id=0
-                # print(matrix)
                 word_id=matrix[-1]
                 for id in reversed(matrix):
                     if id not in list_word_id:
-                        # print(id)
                         target_word_id=id
                         list_word_id.append(id)
                         break                
-                # word_id = np.argmax(predictions[0, word_arg, :])
                 next_word_arg = word_arg + 1
                 text[0, next_word_arg, target_word_id] = 1
                 word = self.id_to_word[target_word_id]
@@ -373,13 +369,15 @@ class Evaluator(object):
         for image_arg,image_name in tqdm(enumerate(image_names)):
             count+=1
             
-            tweet=str(tweet_list[image_arg])  # nan bug
-            # print(tweet)
+            tweet=str(tweet_list[image_arg])
             sequences = self.tokenizer.texts_to_sequences([tweet])
             tweet_vec=pad_sequences(sequences, maxlen=configs['tweet_max_len'])
+            
+            try:
+              features = self.image_names_to_features[image_name]['image_features'][:]
+            except: # 추가 - 예외
+              features = self.image_names_to_features[str(image_name)]['image_features'][:]
 
-            features = self.image_names_to_features[image_name]\
-                                            ['image_features'][:]
             text = np.zeros((1, self.MAX_TOKEN_LENGTH, self.VOCABULARY_SIZE))
             begin_token_id = self.word_to_id[self.BOS]
             text[0, 0, begin_token_id] = 1
@@ -393,15 +391,12 @@ class Evaluator(object):
                 predictions = self.model.predict([text, image_features,tweet_vec])
                 matrix=np.argsort(predictions[0, word_arg, :])
                 word_id=0
-                # print(matrix)
                 word_id=matrix[-1]
                 for id in reversed(matrix):
                     if id not in list_word_id:
-                        # print(id)
                         target_word_id=id
                         list_word_id.append(id)
                         break                
-                # word_id = np.argmax(predictions[0, word_arg, :])
                 next_word_arg = word_arg + 1
                 text[0, next_word_arg, target_word_id] = 1
                 word = self.id_to_word[target_word_id]
@@ -442,7 +437,6 @@ def load_custom_model(root_path,object_image_features_filename,model_filename):
             embedding_size=128,
             embedding_weights=embedding_weights)
     model.load_weights(model_filename)
-    # model.load_model(model_filename)
     return model
 
 if __name__ == '__main__':

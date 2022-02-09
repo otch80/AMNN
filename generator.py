@@ -9,6 +9,7 @@ from keras.preprocessing.sequence import pad_sequences
 import codecs
 from tqdm import tqdm
 from config import configs
+import tensorflow as tf
 from gensim.models import KeyedVectors
 import os
 
@@ -103,19 +104,19 @@ class Generator():
 
         print('Loading training dataset...')
         train_data = pd.read_csv(self.training_filename, delimiter='*')
-        # train_data = np.asarray(train_data,dtype=str)
         self.training_dataset = train_data
 
         print('Loading validation dataset...')
         validation_dataset = pd.read_csv(
                                 self.validation_filename,delimiter='*')
-        # validation_dataset = np.asarray(validation_dataset, dtype=str)
         self.validation_dataset = validation_dataset
 
         print('Loading all tweet dataset...')
-        complete_dataset = pd.read_csv(
-                                self.complete_filename,delimiter='*')
-        # complete_dataset = np.asarray(complete_dataset, dtype=str)
+
+        try:
+          complete_dataset = pd.read_csv(self.complete_filename,delimiter='*')
+        except: # 추가 - 예외
+          complete_dataset = pd.read_csv(self.complete_filename,delimiter='*',on_bad_lines='skip')
 
         self.complete_dataset=complete_dataset
     
@@ -195,33 +196,46 @@ class Generator():
         image_names = data["image_names"].tolist()
         tweets=data["tweets"].tolist()
         tweets_vec=self.get_tweet_features(tweets) #get tweet feature
+
+        print(f"tweets_vec shape : {tweets_vec.shape}") # 추가 - 출력
+
         empty_batch = self.make_empty_batch()
         captions_batch = empty_batch[0]
         images_batch = empty_batch[1]
         targets_batch = empty_batch[2]
         tweets_batch=empty_batch[3]
-        # print(len(image_names))
-        # print(self.tweets_vec.shape)
         batch_counter = 0
-        while True:
+        while True: 
             for data_arg, image_name in enumerate(image_names):
-
-                caption = data["hashtags"].iloc[data_arg]
-                # print(caption)
+                
+                # 추가
+                if type(data["hashtags"].iloc[data_arg]) in str:
+                    caption = data["hashtags"].iloc[data_arg]
+                else:
+                    caption = str(data["hashtags"].iloc[data_arg]) 
+                
                 one_hot_caption = self.format_to_one_hot(caption)
                 captions_batch[batch_counter, :, :] = one_hot_caption
                 targets_batch[batch_counter, :, :]  = self.get_one_hot_target(one_hot_caption)
-                images_batch[batch_counter, :, :]   = self.get_image_features(image_name)
-                # IndexError: index 4555 is out of bounds for axis 0 with size 4555
+                
+                 # 추가
+                if type(image_name) in str:
+                    images_batch[batch_counter, :, :]   = self.get_image_features(image_name)
+                else:
+                    images_batch[batch_counter, :, :]   = self.get_image_features(str(image_name))
+
                 tweets_batch[batch_counter,:]=tweets_vec[data_arg]
-                # print(data_arg)
                 if batch_counter == self.BATCH_SIZE - 1:
                     yield_dictionary = self.wrap_in_dictionary(captions_batch,
                                                                 tweets_batch,
                                                                 images_batch,
                                                                 targets_batch)
-                    
-                    yield yield_dictionary
+
+
+                    # yield yield_dictionary
+                    yield yield_dictionary[0], yield_dictionary[1] # 추가 - 수정
+
+
                     empty_batch = self.make_empty_batch()
                     captions_batch = empty_batch[0]
                     images_batch = empty_batch[1]
@@ -258,9 +272,7 @@ class Generator():
 
     def format_to_one_hot(self,caption):
         tokenized_caption = caption.split()
-     #   tokenized_caption = [self.BOS] + tokenized_caption + [self.EOS]
         tokenized_caption = [self.BOS] + tokenized_caption
-        #print(tokenized_caption)
         one_hot_caption = np.zeros((self.MAX_TOKEN_LENGTH,
                                     self.VOCABULARY_SIZE))
         word_ids = [self.word_to_id[word] for word in tokenized_caption
@@ -273,8 +285,6 @@ class Generator():
         image_features = self.image_names_to_features[image_name]\
                                             ['image_features'][:]
         image_input = np.zeros((self.MAX_TOKEN_LENGTH, self.IMG_FEATS))
-        # print(self.IMG_FEATS)
-        # print(image_features.shape)
         for i in range(self.MAX_TOKEN_LENGTH):
             image_input[i,:] =  image_features
         return image_input
@@ -308,7 +318,6 @@ if __name__ == "__main__":
     preprocessed_data_path = root_path + 'preprocessed_data/'
     generator = Generator(data_path=preprocessed_data_path,
                         batch_size=batch_size,image_features_filename=object_image_features_filename)
-    # print(next(generator.flow('train')))
     count=0
     while(True):
         batch_data=next(generator.flow('train'))
@@ -317,4 +326,3 @@ if __name__ == "__main__":
         print(batch_data[0]['tweet'].shape)
         print(count)
         count+=1
-        # print()

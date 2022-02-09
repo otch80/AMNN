@@ -1,9 +1,11 @@
 from keras import backend as K
-from keras.engine.topology import Layer
+# from keras.engine.topology import Layer
+from tensorflow.keras.layers import Layer# 변경
 from keras import initializers, regularizers, constraints
 
 
 class Attention(Layer):
+
     def __init__(self, step_dim,
                  W_regularizer=None, b_regularizer=None,
                  W_constraint=None, b_constraint=None,
@@ -23,21 +25,42 @@ class Attention(Layer):
         super(Attention, self).__init__(**kwargs)
 
     def build(self, input_shape):
+        
         assert len(input_shape) == 3
+   
+        
+        # self.W = self.add_weight(
+        #     (input_shape[-1],),
+        #     initializer=self.init,
+        #     name='{}_W'.format(self.name),
+        #     regularizer=self.W_regularizer,
+        #     constraint=self.W_constraint)
 
-        self.W = self.add_weight((input_shape[-1],),
-                                 initializer=self.init,
-                                 name='{}_W'.format(self.name),
-                                 regularizer=self.W_regularizer,
-                                 constraint=self.W_constraint)
+        # 수정
+        self.W = self.add_weight(
+            shape = (input_shape[-1],),
+            initializer = self.init,
+            name='{}_W'.format(self.name),
+            regularizer = self.W_regularizer,
+            constraint = self.W_constraint)
+
         self.features_dim = input_shape[-1]
 
         if self.bias:
-            self.b = self.add_weight((input_shape[1],),
-                                     initializer='zero',
-                                     name='{}_b'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
+            # self.b = self.add_weight(
+            #     (input_shape[1],),
+            #     initializer='zero',
+            #     name='{}_b'.format(self.name),
+            #     regularizer=self.b_regularizer,
+            #     constraint=self.b_constraint)
+
+             # 수정
+            self.b = self.add_weight(
+                shape=(input_shape[1],),
+                initializer='zero',
+                name='{}_b'.format(self.name),
+                regularizer=self.b_regularizer,
+                constraint=self.b_constraint)
         else:
             self.b = None
 
@@ -71,3 +94,12 @@ class Attention(Layer):
 
     def compute_output_shape(self, input_shape):
         return input_shape[0],  self.features_dim    
+
+    # 수정 - 추가
+    def get_config(self,return_sequences=True):
+      self.return_sequences = return_sequences
+      config = super().get_config().copy()
+      config.update({
+          'return_sequences': self.return_sequences 
+      })
+      return config
