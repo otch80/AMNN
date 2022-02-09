@@ -232,7 +232,7 @@ id_to_word_filename = 'id_to_word.p'                                # 학습에 
 model_file_path = './trained_models/image_text/weights_final.hdf5'  # 학습 모델 이름
 
 # 해시태그 예측 대상 파일
-extract_img_feature = False                                             # 이미지 피처 추출 수행 여부
+extract_img_feature = True                                              # 이미지 피처 추출 수행 여부
 cnn_extractor = 'resnet50'                                              # 이미지 피처 추출 모델
 target_data_path = './test_dataset/preprocessed_data/'                  # 예측할 이미지와 이미지 피처가 저장된 경로
 target_csv_path = './test_dataset/image_text_tag.csv'                   # 예측할 게시글에 대한 csv 경로
